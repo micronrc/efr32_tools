@@ -18,3 +18,4 @@ the top-level CMakeLists.txt, e.g.
     message(FATAL_ERROR "mkcmakefiles.pl failed")
   endif()
 
+See repo brd4314a-blinky for an example of use
