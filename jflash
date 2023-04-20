@@ -1,0 +1,27 @@
+#!/bin/sh
+
+# jflash <device> <hex file>
+
+if [ $# -ne 2 ]; then
+  echo "Usage: jflash <device> <hex file>" 2>&1
+  exit 1
+fi
+
+DEVICE="$1"
+HEXFILE="$2"
+
+if [ ! -r "${HEXFILE}" ]; then
+  echo "Can't read '${HEXFILE}'" 1>&2
+  exit 1
+fi
+
+JLinkExe <<EoF
+selectinterface SWD
+device ${DEVICE}
+connect
+erase
+loadfile ${HEXFILE}
+r
+g
+exit
+EoF
