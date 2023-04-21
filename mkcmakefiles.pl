@@ -68,7 +68,7 @@ function(create_bin_output TARGET)
       ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${TARGET}.bin
   )
   add_custom_target(flash
-    COMMAND pwd && ${CMAKE_CURRENT_LIST_DIR}/../efr32_tools/jflash ${EFR32_DEVICE} ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${TARGET}.bin
+    COMMAND pwd && ${CMAKE_CURRENT_LIST_DIR}/efr32_tools/jflash ${EFR32_DEVICE} ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${TARGET}.bin
     DEPENDS ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${TARGET}.bin
   )
 endfunction()
