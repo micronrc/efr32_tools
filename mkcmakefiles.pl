@@ -48,6 +48,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "\${CMAKE_C_FLAGS_RELEASE}")
 set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM   NEVER)
 set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY   ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE   ONLY)
+
   ]},
 
   { name => 'firmware', file => 'firmware.cmake',
@@ -68,9 +69,13 @@ function(create_bin_output TARGET)
       ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${TARGET}.bin
   )
   add_custom_target(flash
-    COMMAND pwd && ${CMAKE_CURRENT_LIST_DIR}/efr32_tools/jflash ${EFR32_DEVICE} ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${TARGET}.bin
+    COMMAND ${CMAKE_CURRENT_LIST_DIR}/efr32_tools/jflash ${EFR32_DEVICE} ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${TARGET}.bin
     DEPENDS ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${TARGET}.bin
   )
+  add_custom_target(gdbserver
+    COMMAND $ENV{SEGGER}/JLinkGDBServerExe -device ${EFR32_DEVICE} -port 2000 &
+  )
+    
 endfunction()
 
 function(print_sizes TARGET)
@@ -143,6 +148,15 @@ add_library(iostream STATIC
   ##SDK_SUBDIR##/src/sl_iostream_stdio.c
   ##SDK_SUBDIR##/src/sl_iostream_retarget_stdio.c
 )
+#  ${GECKO_SDK}/platform/common/toolchain/src/sl_memory.c
+
+target_include_directories(iostream PUBLIC
+  ${GECKO_SDK}/platform/emlib/inc
+  ${GECKO_SDK}/platform/common/inc
+  ##SDK_SUBDIR##/inc
+)
+#  ${GECKO_SDK}/platform/common/toolchain/inc
+#  ${GECKO_SDK}/platform/common/toolchain/config/standard
 
 #
 # Explicity linksl_iostream_retarget_stdio.c.obj to force over-ride
@@ -157,13 +171,6 @@ add_custom_command(TARGET iostream
 target_link_options(iostream
   PUBLIC
   -Wl,../lib/sl_iostream_retarget_stdio.c${CMAKE_C_OUTPUT_EXTENSION}
-)
-
-target_include_directories(iostream PUBLIC
-  ${GECKO_SDK}/platform/emlib/inc
-  ${GECKO_SDK}/platform/common/inc
-  ##SDK_SUBDIR##/inc
-  ##SDK_DIR##/platform/Device/SiliconLabs/${CPU_FAMILY_U}/Include
 )
 
 target_link_libraries(iostream PUBLIC efr32_device)
@@ -202,11 +209,11 @@ while (NOT DEVICE_FOUND)
 endwhile()
 
 if (NOT DEVICE_FOUND)
-  message(FATAL_ERROR "failed to find device")
+  message(FATAL_ERROR "failed to find device '${EFR32_DEVICE}'")
 endif()
 
 set(CPU_FAMILY_U ${TEMP_DEVICE})
-set(CPU_FAMILY_U ${CPU_FAMILY_U} PARENT_SCOPE ) #<-- set in the parent scope too
+set(CPU_FAMILY_U ${CPU_FAMILY_U} PARENT_SCOPE) #<-- set in the parent scope too
 string(TOLOWER ${CPU_FAMILY_U} CPU_FAMILY_L)
 message("Family: ${CPU_FAMILY_U}")
 
@@ -308,8 +315,38 @@ target_link_libraries(${PROJECT_NAME} cmsis)
     ]
   },
 
+  #
+  # Rail/Flex support
+  #`
+  { name => 'rail', sdk_subdir => 'platform/radio/rail_lib',
+    file => 'gecko_sdk/rail/CMakeLists.txt',
+    content => q[
+project(rail)
+
+set(RAIL_LIB_DIR ${GECKO_SDK}/platform/radio/rail_lib/autogen/librail_release)
+find_library(RAIL_LIB
+  PATHS ${RAIL_LIB_DIR}
+  NAMES librail_efr32xg22_gcc_release${CMAKE_LINK_LIBRARY_SUFFIX}
+  REQUIRED
+)
+message("Rail Library: ${RAIL_LIB}")
+
+add_library(${PROJECT_NAME} SHARED IMPORTED GLOBAL)
+
+set_target_properties(rail PROPERTIES IMPORTED_LOCATION ${RAIL_LIB})
+
+target_include_directories(rail INTERFACE
+  ##SDK_SUBDIR##/common
+  ##SDK_SUBDIR##/chip/efr32/efr32xg2x
+)
+
+target_link_libraries(rail INTERFACE emlib)
+
+    ]
+  },
+
 #
-# Needs work to add other protocols - e.g. flex
+# Needs work to add other protocols.
 #
   { name => 'protocol', sdk_subdir => 'protocol',
     file => 'gecko_sdk/protocol/CMakeLists.txt',
@@ -362,20 +399,19 @@ add_library(${PROJECT_NAME} INTERFACE)
 target_include_directories(${PROJECT_NAME} INTERFACE
   ##SDK_SUBDIR##/kit/${CPU_FAMILY_U}_${BOARD}/config
   ##SDK_SUBDIR##/kit/common/bsp
-  ##SDK_SUBDIR##/kit/common/bsp/thunderboard
   ##SDK_SUBDIR##/kit/common/drivers
   ##SDK_SUBDIR##/kit/common/halconfig
   ##SDK_SUBDIR##/module/config
-  ##SDK_DIR##/platform/CMSIS/Include
-  ##SDK_DIR##/platform/emlib/inc
-  ##SDK_DIR##/platform/Device/SiliconLabs/${CPU_FAMILY_U}/Include
+  $GECKO_SDK/platform/CMSIS/Include
+  $GECKO_SDK/platform/emlib/inc
+  $GECKO_SDK/platform/Device/SiliconLabs/${CPU_FAMILY_U}/Include
 )
+#  ##SDK_SUBDIR##/kit/common/bsp/thunderboard
 
 #target_compile_options(${PROJECT_NAME}
 #  PUBLIC
 #  -D${EFR32_DEVICE}
 #)
-
     ],
   },
 
